@@ -6,11 +6,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import okio.ByteString;
 import org.newsclub.net.unix.AFUNIXSocket;
 import org.newsclub.net.unix.AFUNIXSocketAddress;
 
 import javax.net.SocketFactory;
-import javax.xml.bind.DatatypeConverter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -144,11 +144,11 @@ public class OkDocker {
 
     private static class Encoder {
       static String encode(String text) {
-        return DatatypeConverter.printHexBinary(text.getBytes());
+        return ByteString.encodeUtf8(text).hex();
       }
 
-      static String decode(String base64) {
-        return new String(DatatypeConverter.parseHexBinary(base64));
+      static String decode(String hex) {
+        return ByteString.decodeHex(hex).utf8();
       }
     }
   }
