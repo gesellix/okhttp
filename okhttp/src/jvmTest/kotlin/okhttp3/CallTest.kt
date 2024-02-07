@@ -27,6 +27,7 @@ import assertk.assertions.isCloseTo
 import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
+import assertk.assertions.isInstanceOf
 import assertk.assertions.isLessThan
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isNotNull
@@ -78,6 +79,7 @@ import mockwebserver3.SocketPolicy.FailHandshake
 import mockwebserver3.SocketPolicy.HalfCloseAfterRequest
 import mockwebserver3.SocketPolicy.NoResponse
 import mockwebserver3.SocketPolicy.StallSocketAtStart
+import mockwebserver3.internal.duplex.MockStreamHandler
 import mockwebserver3.junit5.internal.MockWebServerInstance
 import okhttp3.CallEvent.CallEnd
 import okhttp3.CallEvent.ConnectStart
@@ -97,10 +99,12 @@ import okhttp3.TestUtil.awaitGarbageCollection
 import okhttp3.internal.DoubleInetAddressDns
 import okhttp3.internal.RecordingOkAuthenticator
 import okhttp3.internal.USER_AGENT
+import okhttp3.internal.UnreadableResponseBody
 import okhttp3.internal.addHeaderLenient
 import okhttp3.internal.closeQuietly
 import okhttp3.internal.http.HTTP_EARLY_HINTS
 import okhttp3.internal.http.HTTP_PROCESSING
+import okhttp3.internal.http.HTTP_SWITCHING_PROTOCOLS
 import okhttp3.internal.http.RecordingProxySelector
 import okhttp3.java.net.cookiejar.JavaNetCookieJar
 import okhttp3.okio.LoggingFilesystem
@@ -113,6 +117,7 @@ import okio.BufferedSink
 import okio.ForwardingSource
 import okio.GzipSink
 import okio.Path.Companion.toPath
+import okio.Pipe
 import okio.buffer
 import okio.fakefilesystem.FakeFileSystem
 import okio.use
@@ -4802,6 +4807,120 @@ open class CallTest {
     }.also { expected ->
       assertThat(expected.message!!).contains("Unreadable ResponseBody!")
     }
+  }
+
+  // https://github.com/square/okhttp/issues/5874
+  // call.timeoutEarlyExit()
+  // https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerAttach
+  // https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-client
+  // docker run --rm -it --name attach alpine:edge top -b
+  @Test
+  fun upgradeConnection() {
+//    val mockStreamHandler = object : StreamHandler {
+//      override fun handle(stream: Stream) {
+//        stream.responseBody.writeUtf8("here's the stream")
+//        stream.responseBody.flush()
+//      }
+//    }
+    val mockStreamHandler =
+      MockStreamHandler()
+        .sendResponse("ok?\r\n")
+        .sendResponse("yoyo\r\n")
+        .exhaustResponse()
+        .cancelStream()
+    server.enqueue(
+      MockResponse
+        .Builder()
+        .code(HTTP_SWITCHING_PROTOCOLS)
+        .headers(
+          headersOf(
+            "Connection",
+            "upgrade",
+            "Upgrade",
+            "tcp",
+            "Content-Type",
+            "text/plain; charset=UTF-8",
+//            "Content-Type", "application/vnd.docker.raw-stream",
+          ),
+        )
+//        .body("here's the response body")
+        .streamHandler(mockStreamHandler)
+        .build(),
+    )
+    val call =
+      client.newCall(
+        Request
+          .Builder()
+          .url(server.url("/"))
+          .header("Connection", "upgrade")
+          .header("Upgrade", "tcp")
+          // .post(...)
+          .build(),
+      )
+
+    call.execute().use { response ->
+      val reader =
+        object : Thread("reader") {
+          override fun run() {
+            try {
+              val source = response.streams?.source
+              val buffer = Buffer()
+              var count: Long?
+              println("reading from source...")
+              while (source?.read(buffer, 8192).also { count = it } != -1L) {
+                println("read from source: " + buffer.readUtf8(count!!))
+              }
+            } catch (e: InterruptedException) {
+              throw AssertionError()
+            }
+          }
+        }
+      reader.start()
+      val writer =
+        object : Thread("writer") {
+          override fun run() {
+            try {
+              val sink = response.streams?.sink
+              println("writing to sink...")
+              sink?.writeUtf8("a line\r\n")
+              sink?.flush()
+              println("written to sink")
+            } catch (e: InterruptedException) {
+              throw AssertionError()
+            }
+//            call.cancel()
+          }
+        }
+      writer.start()
+
+      assertThat(response.code).isEqualTo(HTTP_SWITCHING_PROTOCOLS)
+      assertThat(response.headers("Connection").first()).isEqualTo("upgrade", true)
+      assertThat(response.headers("Upgrade").first()).isEqualTo("tcp", true)
+      assertThat(response.headers("Content-Type").first().toMediaType()).isEqualTo("text/plain; charset=UTF-8".toMediaType())
+//      assertThat(response.headers("Content-Type").first().toMediaType()).isEqualTo("application/vnd.docker.raw-stream".toMediaType())
+      assertThat(response.headers("Content-Length")).isEmpty()
+      assertThat(response.body).isInstanceOf<UnreadableResponseBody>()
+
+      val server2client = Pipe(8192L)
+//      server2client.source.buffer()
+//      server2client.sink.buffer()
+//      server2client.sink.buffer().buffer.
+
+//    assertThat(response.streams?.source?.readUtf8Line()).isEqualTo("here's the stream")
+      val chunks = mutableListOf<String?>()
+      val streams = response.streams
+//      streams?.sink?.buffer?.readFully(server2client.sink.buffer().buffer, 8192)
+      var limit = 10
+      while (streams?.source?.isOpen ?: false && limit > 0) {
+        val sink = Buffer()
+        streams.source.readAll(sink)
+        println("sink (n=${sink.size}): " + sink.toString())
+//        chunks.add(streams.source.readUtf8Line())
+        limit -= 1
+      }
+      assertThat(chunks.joinToString()).isEqualTo("here's the stream")
+    }
+    mockStreamHandler.awaitSuccess()
   }
 
   private fun makeFailingCall() {

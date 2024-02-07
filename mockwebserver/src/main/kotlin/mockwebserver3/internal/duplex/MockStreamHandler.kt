@@ -68,7 +68,7 @@ class MockStreamHandler : StreamHandler {
   @JvmOverloads
   fun sendResponse(
     s: String,
-    responseSent: CountDownLatch = CountDownLatch(0),
+    responseSent: CountDownLatch = CountDownLatch(1),
   ) = apply {
     actions += { stream ->
       stream.responseBody.writeUtf8(s)
