@@ -28,6 +28,7 @@ import okhttp3.internal.connection.Exchange
 import okhttp3.internal.http.HTTP_PERM_REDIRECT
 import okhttp3.internal.http.HTTP_TEMP_REDIRECT
 import okhttp3.internal.http.parseChallenges
+import okhttp3.internal.http1.Streams
 import okio.Buffer
 
 /**
@@ -77,6 +78,10 @@ class Response internal constructor(
    * all instances of [ResponseBody].
    */
   @get:JvmName("body") val body: ResponseBody,
+  /**
+   * Non-null if this response is a successful upgrade ...
+   */
+  @get:JvmName("streams") val streams: Streams?,
   /**
    * Returns the raw response received from the network. Will be null if this response didn't use
    * the network, such as when the response is fully cached. The body of the returned response
@@ -333,6 +338,7 @@ class Response internal constructor(
     internal var handshake: Handshake? = null
     internal var headers: Headers.Builder
     internal var body: ResponseBody = ResponseBody.EMPTY
+    internal var streams: Streams? = null
     internal var networkResponse: Response? = null
     internal var cacheResponse: Response? = null
     internal var priorResponse: Response? = null
@@ -353,6 +359,7 @@ class Response internal constructor(
       this.handshake = response.handshake
       this.headers = response.headers.newBuilder()
       this.body = response.body
+      this.streams = response.streams
       this.networkResponse = response.networkResponse
       this.cacheResponse = response.cacheResponse
       this.priorResponse = response.priorResponse
@@ -426,6 +433,11 @@ class Response internal constructor(
         this.body = body
       }
 
+    open fun streams(streams: Streams) =
+      apply {
+        this.streams = streams
+      }
+
     open fun networkResponse(networkResponse: Response?) =
       apply {
         checkSupportResponse("networkResponse", networkResponse)
@@ -483,6 +495,7 @@ class Response internal constructor(
         handshake,
         headers.build(),
         body,
+        streams,
         networkResponse,
         cacheResponse,
         priorResponse,

@@ -604,11 +604,18 @@ public class MockWebServer : Closeable {
           "Upgrade".equals(request.headers["Connection"], ignoreCase = true) &&
             "websocket".equals(request.headers["Upgrade"], ignoreCase = true)
         val responseWantsWebSockets = response.webSocketListener != null
+      val requestWantsTcp =
+        "Upgrade".equals(request.headers["Connection"], ignoreCase = true) &&
+          "tcp".equals(request.headers["Upgrade"], ignoreCase = true)
+      val responseWantsStream = response.streamHandler != null
         if (requestWantsWebSockets && responseWantsWebSockets) {
           handleWebSocketUpgrade(socket, source, sink, request, response)
+        reuseSocket = false
+      } else if (requestWantsTcp && responseWantsStream) {
+        writeHttpResponse(socket, source, sink, response)
           reuseSocket = false
         } else {
-          writeHttpResponse(socket, sink, response)
+        writeHttpResponse(socket, source, sink, response)
         }
 
         if (logger.isLoggable(Level.FINE)) {
@@ -718,7 +725,7 @@ public class MockWebServer : Closeable {
 
       val peek = dispatcher.peek()
       for (response in peek.informationalResponses) {
-        writeHttpResponse(socket, sink, response)
+        writeHttpResponse(socket, source, sink, response)
       }
 
       val requestBodySink =
@@ -799,7 +806,7 @@ public class MockWebServer : Closeable {
         .newBuilder()
         .setHeader("Sec-WebSocket-Accept", WebSocketProtocol.acceptHeader(key!!))
         .build()
-    writeHttpResponse(socket, sink, webSocketResponse)
+    writeHttpResponse(socket, source, sink, webSocketResponse)
 
     // Adapt the request and response into our Request and Response domain model.
     val scheme = if (request.handshake != null) "https" else "http"
@@ -856,6 +863,7 @@ public class MockWebServer : Closeable {
   @Throws(IOException::class)
   private fun writeHttpResponse(
     socket: Socket,
+    source: BufferedSource,
     sink: BufferedSink,
     response: MockResponse,
   ) {
@@ -864,6 +872,25 @@ public class MockWebServer : Closeable {
     sink.writeUtf8("\r\n")
 
     writeHeaders(sink, response.headers)
+
+    if (response.streamHandler != null) {
+      response.streamHandler.handle(
+        object : Stream {
+          override val requestBody: BufferedSource
+            get() = source
+          override val responseBody: BufferedSink
+            get() = sink
+
+          override fun cancel() {
+            sink.flush()
+            socket.closeQuietly()
+//          source.closeQuietly()
+//          sink.closeQuietly()
+          }
+        },
+      )
+      return
+    }
 
     val body = response.body ?: return
     socket.sleepWhileOpen(response.bodyDelayNanos)
