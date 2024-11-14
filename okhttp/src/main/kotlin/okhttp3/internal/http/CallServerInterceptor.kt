@@ -19,9 +19,13 @@ import java.io.IOException
 import java.net.ProtocolException
 import okhttp3.Interceptor
 import okhttp3.Response
+import okhttp3.internal.closeQuietly
 import okhttp3.internal.connection.Exchange
+import okhttp3.internal.http1.Streams
 import okhttp3.internal.http2.ConnectionShutdownException
 import okhttp3.internal.stripBody
+import okio.BufferedSink
+import okio.BufferedSource
 import okio.buffer
 
 /** This is the last interceptor in the chain. It makes a network call to the server. */
@@ -123,13 +127,33 @@ class CallServerInterceptor(private val forWebSocket: Boolean) : Interceptor {
       exchange.responseHeadersEnd(response)
 
       response =
-        if (forWebSocket && code == 101) {
+        if (forWebSocket && code == HTTP_SWITCHING_PROTOCOLS) {
           // Connection is upgrading, but we need to ensure interceptors see a non-null response body.
           response.stripBody()
         } else {
-          response.newBuilder()
-            .body(exchange.openResponseBody(response))
-            .build()
+          if (code == HTTP_SWITCHING_PROTOCOLS &&
+            "upgrade".equals(response.request.header("Connection"), ignoreCase = true) &&
+            "upgrade".equals(response.header("Connection"), ignoreCase = true) &&
+            "tcp".equals(response.request.header("Upgrade"), ignoreCase = true) &&
+            "tcp".equals(response.header("Upgrade"), ignoreCase = true)) {
+            response.newBuilder()
+              .streams(streams = object : Streams {
+                override val source: BufferedSource
+                  get() = exchange.openResponseBody(response).source()
+                override val sink: BufferedSink
+                  get() = exchange.createRequestBody(response.request, true).buffer()
+
+                override fun cancel() {
+                  source.closeQuietly()
+                  sink.closeQuietly()
+                }
+              })
+              .build()
+          } else {
+            response.newBuilder()
+              .body(exchange.openResponseBody(response))
+              .build()
+          }
         }
       if ("close".equals(response.request.header("Connection"), ignoreCase = true) ||
         "close".equals(response.header("Connection"), ignoreCase = true)

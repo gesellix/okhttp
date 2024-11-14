@@ -38,10 +38,12 @@ import okhttp3.internal.commonPriorResponse
 import okhttp3.internal.commonProtocol
 import okhttp3.internal.commonRemoveHeader
 import okhttp3.internal.commonRequest
+import okhttp3.internal.commonStreams
 import okhttp3.internal.commonToString
 import okhttp3.internal.commonTrailers
 import okhttp3.internal.connection.Exchange
 import okhttp3.internal.http.parseChallenges
+import okhttp3.internal.http1.Streams
 import okio.Buffer
 
 /**
@@ -88,6 +90,10 @@ class Response internal constructor(
    * and [priorResponse].
    */
   @get:JvmName("body") val body: ResponseBody,
+  /**
+   * Non-null if this response is a successful upgrade ...
+   */
+  @get:JvmName("streams") val streams: Streams?,
   /**
    * Returns the raw response received from the network. Will be null if this response didn't use
    * the network, such as when the response is fully cached. The body of the returned response
@@ -321,6 +327,7 @@ class Response internal constructor(
     internal var handshake: Handshake? = null
     internal var headers: Headers.Builder
     internal var body: ResponseBody = commonEmptyResponse
+    internal var streams: Streams? = null
     internal var networkResponse: Response? = null
     internal var cacheResponse: Response? = null
     internal var priorResponse: Response? = null
@@ -341,6 +348,7 @@ class Response internal constructor(
       this.handshake = response.handshake
       this.headers = response.headers.newBuilder()
       this.body = response.body
+      this.streams = response.streams
       this.networkResponse = response.networkResponse
       this.cacheResponse = response.cacheResponse
       this.priorResponse = response.priorResponse
@@ -389,6 +397,8 @@ class Response internal constructor(
 
     open fun body(body: ResponseBody) = commonBody(body)
 
+    open fun streams(streams: Streams) = commonStreams(streams)
+
     open fun networkResponse(networkResponse: Response?) = commonNetworkResponse(networkResponse)
 
     open fun cacheResponse(cacheResponse: Response?) = commonCacheResponse(cacheResponse)
@@ -423,6 +433,7 @@ class Response internal constructor(
         handshake,
         headers.build(),
         body,
+        streams,
         networkResponse,
         cacheResponse,
         priorResponse,
