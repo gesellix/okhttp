@@ -137,27 +137,31 @@ class CallServerInterceptor(
             "upgrade".equals(response.request.header("Connection"), ignoreCase = true) &&
             "upgrade".equals(response.header("Connection"), ignoreCase = true) &&
             "tcp".equals(response.request.header("Upgrade"), ignoreCase = true) &&
-            "tcp".equals(response.header("Upgrade"), ignoreCase = true)) {
+            "tcp".equals(response.header("Upgrade"), ignoreCase = true)
+          ) {
             exchange.call.timeoutEarlyExit()
             exchange.connection.noNewExchanges()
             exchange.noNewExchangesOnConnection()
             exchange.connection.socket().soTimeout = 0
-            response.newBuilder()
-              .streams(streams = object : Streams {
-                override val source: BufferedSource
-                  get() = exchange.openResponseBody(response).source()
-                override val sink: BufferedSink
-                  get() = exchange.createRequestBody(response.request, true).buffer()
+            response
+              .newBuilder()
+              .streams(
+                streams =
+                  object : Streams {
+                    override val source: BufferedSource
+                      get() = exchange.openResponseBody(response).source()
+                    override val sink: BufferedSink
+                      get() = exchange.createRequestBody(response.request, true).buffer()
 
-                override fun cancel() {
-                  source.closeQuietly()
-                  sink.closeQuietly()
-                }
-              })
-              .build()
+                    override fun cancel() {
+                      source.closeQuietly()
+                      sink.closeQuietly()
+                    }
+                  },
+              ).build()
           } else {
-          response
-            .newBuilder()
+            response
+              .newBuilder()
               .body(exchange.openResponseBody(response))
               .build()
           }

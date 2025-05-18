@@ -78,8 +78,6 @@ import mockwebserver3.SocketPolicy.FailHandshake
 import mockwebserver3.SocketPolicy.HalfCloseAfterRequest
 import mockwebserver3.SocketPolicy.NoResponse
 import mockwebserver3.SocketPolicy.StallSocketAtStart
-import mockwebserver3.Stream
-import mockwebserver3.StreamHandler
 import mockwebserver3.junit5.internal.MockWebServerInstance
 import okhttp3.CallEvent.CallEnd
 import okhttp3.CallEvent.ConnectStart
@@ -113,7 +111,6 @@ import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import okio.Buffer
 import okio.BufferedSink
-import okio.BufferedSource
 import okio.ForwardingSource
 import okio.GzipSink
 import okio.Path.Companion.toPath
@@ -4837,14 +4834,19 @@ open class CallTest {
 //        }
 //      }
     server.enqueue(
-      MockResponse.Builder()
+      MockResponse
+        .Builder()
         .code(HTTP_SWITCHING_PROTOCOLS)
-        .headers(headersOf(
-          "Connection", "upgrade",
-          "Upgrade", "tcp",
-          "Content-Type", "text/plain; charset=UTF-8"
-        ))
-        .body("here's the stream")
+        .headers(
+          headersOf(
+            "Connection",
+            "upgrade",
+            "Upgrade",
+            "tcp",
+            "Content-Type",
+            "text/plain; charset=UTF-8",
+          ),
+        ).body("here's the stream")
 //        .streamHandler(object : StreamHandler {
 //          override fun handle(stream: Stream) {
 //            stream.responseBody.writeUtf8("here's the stream")
@@ -4853,12 +4855,19 @@ open class CallTest {
 //        })
         .build(),
     )
-    val call = client.newCall(Request(
-      url = server.url("/"),
-      headers = headersOf(
-        "Connection", "upgrade",
-        "Upgrade", "tcp",
-      )))
+    val call =
+      client.newCall(
+        Request(
+          url = server.url("/"),
+          headers =
+            headersOf(
+              "Connection",
+              "upgrade",
+              "Upgrade",
+              "tcp",
+            ),
+        ),
+      )
     val response = call.execute()
     assertThat(response.streams?.source?.readUtf8Line()).isEqualTo("here's the stream")
     assertThat(response.headers("Content-Type").first().toMediaType())
