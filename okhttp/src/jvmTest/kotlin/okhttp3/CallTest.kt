@@ -78,6 +78,8 @@ import mockwebserver3.SocketPolicy.FailHandshake
 import mockwebserver3.SocketPolicy.HalfCloseAfterRequest
 import mockwebserver3.SocketPolicy.NoResponse
 import mockwebserver3.SocketPolicy.StallSocketAtStart
+import mockwebserver3.Stream
+import mockwebserver3.StreamHandler
 import mockwebserver3.junit5.internal.MockWebServerInstance
 import okhttp3.CallEvent.CallEnd
 import okhttp3.CallEvent.ConnectStart
@@ -111,6 +113,7 @@ import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import okio.Buffer
 import okio.BufferedSink
+import okio.BufferedSource
 import okio.ForwardingSource
 import okio.GzipSink
 import okio.Path.Companion.toPath
@@ -4812,9 +4815,29 @@ open class CallTest {
   // docker run --rm -it --name attach alpine:edge top -b
   @Test
   fun upgradeConnection() {
+//    val body: ResponseBody =
+//      object : ResponseBody() {
+//        override fun contentType(): MediaType? {
+//          return null
+//        }
+//
+//        override fun contentLength(): Long {
+//          return 5
+//        }
+//
+//        override fun source(): BufferedSource {
+//          val source = Buffer().writeUtf8("hello")
+//          return object : ForwardingSource(source) {
+//            @Throws(IOException::class)
+//            override fun close() {
+//              closed.set(true)
+//              super.close()
+//            }
+//          }.buffer()
+//        }
+//      }
     server.enqueue(
       MockResponse.Builder()
-//        .code(HTTP_OK)
         .code(HTTP_SWITCHING_PROTOCOLS)
         .headers(headersOf(
           "Connection", "upgrade",

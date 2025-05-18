@@ -138,6 +138,10 @@ class CallServerInterceptor(
             "upgrade".equals(response.header("Connection"), ignoreCase = true) &&
             "tcp".equals(response.request.header("Upgrade"), ignoreCase = true) &&
             "tcp".equals(response.header("Upgrade"), ignoreCase = true)) {
+            exchange.call.timeoutEarlyExit()
+            exchange.connection.noNewExchanges()
+            exchange.noNewExchangesOnConnection()
+            exchange.connection.socket().soTimeout = 0
             response.newBuilder()
               .streams(streams = object : Streams {
                 override val source: BufferedSource
