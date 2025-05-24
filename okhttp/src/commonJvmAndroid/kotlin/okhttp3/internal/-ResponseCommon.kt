@@ -31,6 +31,7 @@ import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.asResponseBody
 import okhttp3.internal.http.HTTP_PERM_REDIRECT
 import okhttp3.internal.http.HTTP_TEMP_REDIRECT
+import okhttp3.internal.http1.Streams
 import okio.Buffer
 import okio.IOException
 import okio.Source
@@ -171,6 +172,11 @@ internal fun Response.Builder.commonTrailers(trailersFn: (() -> Headers)) =
 internal fun Response.Builder.commonBody(body: ResponseBody) =
   apply {
     this.body = body
+  }
+
+internal fun Response.Builder.commonStreams(streams: Streams) =
+  apply {
+    this.streams = streams
   }
 
 internal fun Response.Builder.commonNetworkResponse(networkResponse: Response?) =

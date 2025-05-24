@@ -101,6 +101,7 @@ import okhttp3.internal.addHeaderLenient
 import okhttp3.internal.closeQuietly
 import okhttp3.internal.http.HTTP_EARLY_HINTS
 import okhttp3.internal.http.HTTP_PROCESSING
+import okhttp3.internal.http.HTTP_SWITCHING_PROTOCOLS
 import okhttp3.internal.http.RecordingProxySelector
 import okhttp3.java.net.cookiejar.JavaNetCookieJar
 import okhttp3.okio.LoggingFilesystem
@@ -4802,6 +4803,82 @@ open class CallTest {
     }.also { expected ->
       assertThat(expected.message!!).contains("Unreadable ResponseBody!")
     }
+  }
+
+  // https://github.com/square/okhttp/issues/5874
+  // call.timeoutEarlyExit()
+  // https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerAttach
+  // https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-client
+  // docker run --rm -it --name attach alpine:edge top -b
+  @Test
+  fun upgradeConnection() {
+//    val body: ResponseBody =
+//      object : ResponseBody() {
+//        override fun contentType(): MediaType? {
+//          return null
+//        }
+//
+//        override fun contentLength(): Long {
+//          return 5
+//        }
+//
+//        override fun source(): BufferedSource {
+//          val source = Buffer().writeUtf8("hello")
+//          return object : ForwardingSource(source) {
+//            @Throws(IOException::class)
+//            override fun close() {
+//              closed.set(true)
+//              super.close()
+//            }
+//          }.buffer()
+//        }
+//      }
+    server.enqueue(
+      MockResponse
+        .Builder()
+        .code(HTTP_SWITCHING_PROTOCOLS)
+        .headers(
+          headersOf(
+            "Connection",
+            "upgrade",
+            "Upgrade",
+            "tcp",
+            "Content-Type",
+            "text/plain; charset=UTF-8",
+          ),
+        ).body("here's the stream")
+//        .streamHandler(object : StreamHandler {
+//          override fun handle(stream: Stream) {
+//            stream.responseBody.writeUtf8("here's the stream")
+//            stream.responseBody.flush()
+//          }
+//        })
+        .build(),
+    )
+    val call =
+      client.newCall(
+        Request(
+          url = server.url("/"),
+          headers =
+            headersOf(
+              "Connection",
+              "upgrade",
+              "Upgrade",
+              "tcp",
+            ),
+        ),
+      )
+    val response = call.execute()
+    assertThat(response.streams?.source?.readUtf8Line()).isEqualTo("here's the stream")
+    assertThat(response.headers("Content-Type").first().toMediaType())
+      .isEqualTo("text/plain; charset=UTF-8".toMediaType())
+//    assertThat(response.priorResponse?.body?.contentType())
+//      .isEqualTo("text/plain; charset=UTF-8".toMediaType())
+//    assertFailsWith<IllegalStateException> {
+//      response.priorResponse?.body?.string()
+//    }.also { expected ->
+//      assertThat(expected.message!!).contains("Unreadable ResponseBody!")
+//    }
   }
 
   private fun makeFailingCall() {
