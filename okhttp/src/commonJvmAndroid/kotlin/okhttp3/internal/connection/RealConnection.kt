@@ -41,6 +41,7 @@ import okhttp3.internal.concurrent.withLock
 import okhttp3.internal.http.ExchangeCodec
 import okhttp3.internal.http.RealInterceptorChain
 import okhttp3.internal.http1.Http1ExchangeCodec
+import okhttp3.internal.http1.Streams
 import okhttp3.internal.http2.ConnectionShutdownException
 import okhttp3.internal.http2.ErrorCode
 import okhttp3.internal.http2.FlowControlListener
@@ -218,7 +219,7 @@ class RealConnection internal constructor(
     // 2. The routes must share an IP address.
     if (routes == null || !routeMatchesAny(routes)) return false
 
-    // 3. This connection's server certificate's must cover the new host.
+    // 3. This connection's server certificates must cover the new host.
     if (address.hostnameVerifier !== OkHostnameVerifier) return false
     if (!supportsUrl(address.url)) return false
 
@@ -303,6 +304,30 @@ class RealConnection internal constructor(
 
       override fun cancel() {
         exchange.cancel()
+      }
+    }
+  }
+
+  @Throws(SocketException::class)
+  internal fun newHttpStreams(exchange: Exchange): Streams {
+    socket.soTimeout = 0
+    noNewExchanges()
+    val realSource = this.source
+    val realSink = this.sink
+    return object : Streams {
+      override val source: BufferedSource
+        get() = realSource.buffer
+
+//        get() = exchange.openResponseBody(response).source()
+      override val sink: BufferedSink
+        get() = realSink.buffer
+//        get() = exchange.createRequestBody(response.request, true).buffer()
+
+      override fun cancel() {
+        sink.flush()
+        exchange.cancel()
+        source.closeQuietly()
+        sink.closeQuietly()
       }
     }
   }
