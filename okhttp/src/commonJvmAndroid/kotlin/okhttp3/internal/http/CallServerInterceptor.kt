@@ -139,7 +139,7 @@ class CallServerInterceptor(
             response
               .stripBody()
               .newBuilder()
-              .streams(exchange.newHttpStreams())
+              .socket(exchange.newHttpStreams())
               .build()
           } else {
           val responseBody = exchange.openResponseBody(response)

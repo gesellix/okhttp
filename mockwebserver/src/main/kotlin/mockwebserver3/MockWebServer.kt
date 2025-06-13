@@ -607,15 +607,15 @@ public class MockWebServer : Closeable {
       val requestWantsTcp =
         "Upgrade".equals(request.headers["Connection"], ignoreCase = true) &&
           "tcp".equals(request.headers["Upgrade"], ignoreCase = true)
-      val responseWantsStream = response.streamHandler != null
+      val responseWantsStream = response.socketHandler != null
         if (requestWantsWebSockets && responseWantsWebSockets) {
           handleWebSocketUpgrade(socket, source, sink, request, response)
         reuseSocket = false
       } else if (requestWantsTcp && responseWantsStream) {
-        writeHttpResponse(socket, source, sink, response)
+        writeHttpResponse(socket, sink, response)
           reuseSocket = false
         } else {
-        writeHttpResponse(socket, source, sink, response)
+        writeHttpResponse(socket, sink, response)
         }
 
         if (logger.isLoggable(Level.FINE)) {
@@ -725,7 +725,7 @@ public class MockWebServer : Closeable {
 
       val peek = dispatcher.peek()
       for (response in peek.informationalResponses) {
-        writeHttpResponse(socket, source, sink, response)
+        writeHttpResponse(socket, sink, response)
       }
 
       val requestBodySink =
@@ -806,7 +806,7 @@ public class MockWebServer : Closeable {
         .newBuilder()
         .setHeader("Sec-WebSocket-Accept", WebSocketProtocol.acceptHeader(key!!))
         .build()
-    writeHttpResponse(socket, source, sink, webSocketResponse)
+    writeHttpResponse(socket, sink, webSocketResponse)
 
     // Adapt the request and response into our Request and Response domain model.
     val scheme = if (request.handshake != null) "https" else "http"
@@ -863,7 +863,6 @@ public class MockWebServer : Closeable {
   @Throws(IOException::class)
   private fun writeHttpResponse(
     socket: Socket,
-    source: BufferedSource,
     sink: BufferedSink,
     response: MockResponse,
   ) {
@@ -873,19 +872,17 @@ public class MockWebServer : Closeable {
 
     writeHeaders(sink, response.headers)
 
-    if (response.streamHandler != null) {
-      response.streamHandler.handle(
-        object : Stream {
-          override val requestBody: BufferedSource
-            get() = source
-          override val responseBody: BufferedSink
-            get() = sink
+    if (response.socketHandler != null) {
+      response.socketHandler.handle(
+        object : okio.Socket {
+          override val source: BufferedSource
+            get() = socket.source().buffer()
+          override val sink: BufferedSink
+            get() = socket.sink().buffer()
 
           override fun cancel() {
-            sink.flush()
+            socket.sink().flush()
             socket.closeQuietly()
-//          source.closeQuietly()
-//          sink.closeQuietly()
           }
         },
       )
