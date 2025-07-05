@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import java.net.URI
+import java.text.SimpleDateFormat
+import java.util.Date
 
 buildscript {
   dependencies {
@@ -51,8 +53,9 @@ configure<SpotlessExtension> {
 }
 
 allprojects {
-  group = "com.squareup.okhttp3"
-  version = "5.1.0-SNAPSHOT"
+  group = "de.gesellix.okhttp3-forked"
+  version = "5.1.0-${SimpleDateFormat("yyyy-MM-dd\'T\'HH-mm-ss").format(Date())}"
+//  version = "5.1.0-SNAPSHOT"
 
   repositories {
     mavenCentral()
@@ -317,8 +320,10 @@ subprojects {
 
   plugins.withId("com.vanniktech.maven.publish.base") {
     configure<MavenPublishBaseExtension> {
-      publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
-      signAllPublications()
+      if (!gradle.startParameter.taskNames.contains("publishAllPublicationsToGithubPackagesRepository")) {
+        publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
+        signAllPublications()
+      }
       pom {
         name.set(project.name)
         description.set("Square’s meticulous HTTP client for Java and Kotlin.")
@@ -339,6 +344,23 @@ subprojects {
           developer {
             name.set("Square, Inc.")
           }
+        }
+      }
+    }
+    configure<PublishingExtension> {
+      repositories {
+        maven {
+          name = "githubPackages"
+          url = uri("https://maven.pkg.github.com/gesellix/okhttp")
+          // username and password (a personal Github access token) should be specified as
+          // `githubPackagesUsername` and `githubPackagesPassword` Gradle properties or alternatively
+          // as `ORG_GRADLE_PROJECT_githubPackagesUsername` and `ORG_GRADLE_PROJECT_githubPackagesPassword`
+          // environment variables
+          credentials(PasswordCredentials::class)
+//          credentials {
+//            username = System.getenv("GITHUB_ACTOR")
+//            password = System.getenv("GITHUB_TOKEN")
+//          }
         }
       }
     }
