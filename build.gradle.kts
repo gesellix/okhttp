@@ -353,11 +353,11 @@ subprojects {
           // `githubPackagesUsername` and `githubPackagesPassword` Gradle properties or alternatively
           // as `ORG_GRADLE_PROJECT_githubPackagesUsername` and `ORG_GRADLE_PROJECT_githubPackagesPassword`
           // environment variables
-//          credentials(PasswordCredentials::class)
-          credentials {
-            username = System.getenv("GITHUB_ACTOR")
-            password = System.getenv("GITHUB_TOKEN")
-          }
+          credentials(PasswordCredentials::class)
+//          credentials {
+//            username = System.getenv("GITHUB_ACTOR")
+//            password = System.getenv("GITHUB_TOKEN")
+//          }
         }
       }
     }
