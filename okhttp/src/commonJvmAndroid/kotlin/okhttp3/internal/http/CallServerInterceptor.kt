@@ -142,17 +142,17 @@ class CallServerInterceptor(
               .socket(exchange.newHttpStreams())
               .build()
           } else {
-          val responseBody = exchange.openResponseBody(response)
+            val responseBody = exchange.openResponseBody(response)
             response
               .newBuilder()
-            .body(responseBody)
-            .trailers {
-              val source = responseBody.source()
-              if (source.isOpen) {
-                source.skipAll()
-              }
-              exchange.trailers()
-            }.build()
+              .body(responseBody)
+              .trailers {
+                val source = responseBody.source()
+                if (source.isOpen) {
+                  source.skipAll()
+                }
+                exchange.trailers()
+              }.build()
           }
         }
       if ("close".equals(response.request.header("Connection"), ignoreCase = true) ||
