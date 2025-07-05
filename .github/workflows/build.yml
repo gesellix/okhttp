@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - hijack
   pull_request:
     types: [opened, labeled, unlabeled, synchronize]
 
@@ -16,7 +17,7 @@ env:
 jobs:
   publish-ghcr:
     runs-on: ubuntu-latest
-    if: github.repository == 'gesellix/okhttp' && github.ref == 'refs/heads/hijack'
+    if: github.repository == 'gesellix/okhttp'
 
     steps:
       - name: Checkout
