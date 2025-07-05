@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 import java.net.URI
+import java.text.SimpleDateFormat
+import java.util.Date
 
 buildscript {
   dependencies {
@@ -52,7 +54,8 @@ configure<SpotlessExtension> {
 
 allprojects {
   group = "de.gesellix.okhttp3-forked"
-  version = "5.1.0-SNAPSHOT"
+  version = "5.1.0-${SimpleDateFormat("yyyy-MM-dd\'T\'HH-mm-ss").format(Date())}"
+//  version = "5.1.0-SNAPSHOT"
 
   repositories {
     mavenCentral()
