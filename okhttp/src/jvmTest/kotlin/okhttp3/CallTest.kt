@@ -19,11 +19,13 @@ import assertk.all
 import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.containsExactly
+import assertk.assertions.containsExactlyInAnyOrder
 import assertk.assertions.doesNotContain
 import assertk.assertions.hasMessage
 import assertk.assertions.hasSize
 import assertk.assertions.index
 import assertk.assertions.isCloseTo
+import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isIn
@@ -77,15 +79,6 @@ import mockwebserver3.SocketEffect.CloseSocket
 import mockwebserver3.SocketEffect.ShutdownConnection
 import mockwebserver3.SocketEffect.Stall
 import mockwebserver3.junit5.StartStop
-import mockwebserver3.SocketPolicy.DisconnectAfterRequest
-import mockwebserver3.SocketPolicy.DisconnectAtEnd
-import mockwebserver3.SocketPolicy.DisconnectAtStart
-import mockwebserver3.SocketPolicy.FailHandshake
-import mockwebserver3.SocketPolicy.HalfCloseAfterRequest
-import mockwebserver3.SocketPolicy.NoResponse
-import mockwebserver3.SocketPolicy.StallSocketAtStart
-import mockwebserver3.internal.duplex.MockSocketHandler
-import mockwebserver3.junit5.internal.MockWebServerInstance
 import okhttp3.CallEvent.CallEnd
 import okhttp3.CallEvent.ConnectStart
 import okhttp3.CallEvent.ConnectionAcquired
@@ -107,6 +100,7 @@ import okhttp3.internal.USER_AGENT
 import okhttp3.internal.UnreadableResponseBody
 import okhttp3.internal.addHeaderLenient
 import okhttp3.internal.closeQuietly
+import okhttp3.internal.duplex.MockSocketHandler
 import okhttp3.internal.http.HTTP_EARLY_HINTS
 import okhttp3.internal.http.HTTP_PROCESSING
 import okhttp3.internal.http.HTTP_SWITCHING_PROTOCOLS
@@ -4862,7 +4856,7 @@ open class CallTest {
       .sendResponse("response B\n")
       .receiveRequest("request C\n")
       .sendResponse("response D\n")
-      .sendResponse("request E\n")
+      .sendResponse("response E\n")
       .receiveRequest("response F\n")
       .exhaustRequest()
       .exhaustResponse()
@@ -4883,7 +4877,6 @@ open class CallTest {
         ).socketHandler(mockStreamHandler)
         .build(),
     )
-    server.start()
     val call =
       client.newCall(
         Request
@@ -4933,13 +4926,17 @@ open class CallTest {
       writer.buffer().writeUtf8("response F\n").flush()
     }
 
-    val first = received.poll(2, TimeUnit.SECONDS)
-    val second = received.poll(2, TimeUnit.SECONDS)
-    assertThat(first).isNotNull().startsWith("response B")
-    assertThat(second).isNotNull().startsWith("response D")
+    val responses = mutableListOf<String?>()
+    responses.add(received.poll(2, TimeUnit.SECONDS))
+    responses.add(received.poll(2, TimeUnit.SECONDS))
+    responses.add(received.poll(2, TimeUnit.SECONDS))
+    assertThat(responses).containsExactly(
+      "response B",
+      "response D",
+      "response E",
+    )
 
     socket?.cancel()
-    server.shutdown()
   }
 
   private fun makeFailingCall() {
