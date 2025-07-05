@@ -51,7 +51,7 @@ configure<SpotlessExtension> {
 }
 
 allprojects {
-  group = "com.squareup.okhttp3"
+  group = "com.squareup.okhttp3.forked"
   version = "5.1.0-SNAPSHOT"
 
   repositories {
@@ -317,8 +317,10 @@ subprojects {
 
   plugins.withId("com.vanniktech.maven.publish.base") {
     configure<MavenPublishBaseExtension> {
-      publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
-      signAllPublications()
+      if (!gradle.startParameter.taskNames.contains("publishAllPublicationsToGithubPackagesRepository")) {
+        publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
+        signAllPublications()
+      }
       pom {
         name.set(project.name)
         description.set("Square’s meticulous HTTP client for Java and Kotlin.")
@@ -339,6 +341,19 @@ subprojects {
           developer {
             name.set("Square, Inc.")
           }
+        }
+      }
+    }
+    configure<PublishingExtension> {
+      repositories {
+        maven {
+          name = "githubPackages"
+          url = uri("https://maven.pkg.github.com/gesellix/okhttp")
+          // username and password (a personal Github access token) should be specified as
+          // `githubPackagesUsername` and `githubPackagesPassword` Gradle properties or alternatively
+          // as `ORG_GRADLE_PROJECT_githubPackagesUsername` and `ORG_GRADLE_PROJECT_githubPackagesPassword`
+          // environment variables
+          credentials(PasswordCredentials::class)
         }
       }
     }
