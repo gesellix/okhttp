@@ -51,7 +51,7 @@ configure<SpotlessExtension> {
 }
 
 allprojects {
-  group = "com.squareup.okhttp3.forked"
+  group = "de.gesellix.okhttp3-forked"
   version = "5.1.0-SNAPSHOT"
 
   repositories {
