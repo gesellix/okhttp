@@ -4904,8 +4904,6 @@ open class CallTest {
       assertThat(socket).isNotNull()
 
       val reader = socket!!.source
-      val writer = socket.sink
-
       val readerThread =
         object : Thread("reader") {
           override fun run() {
@@ -4921,6 +4919,7 @@ open class CallTest {
         }
       readerThread.start()
 
+      val writer = socket.sink
       writer.buffer().writeUtf8("request A\n").flush()
       writer.buffer().writeUtf8("request C\n").flush()
       writer.buffer().writeUtf8("response F\n").flush()
