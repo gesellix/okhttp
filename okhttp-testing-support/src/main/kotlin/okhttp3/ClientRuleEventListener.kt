@@ -199,10 +199,13 @@ class ClientRuleEventListener(
     delegate.requestFailed(call, ioe)
   }
 
-  override fun socketSinkStart(call: Call) {
+  override fun socketSinkStart(
+    call: Call,
+    connection: Connection,
+  ) {
     logWithTime("socketSinkStart")
 
-    delegate.socketSinkStart(call)
+    delegate.socketSinkStart(call, connection)
   }
 
   override fun socketSinkEnd(
