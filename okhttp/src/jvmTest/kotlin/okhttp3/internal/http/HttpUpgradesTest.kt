@@ -122,8 +122,19 @@ class HttpUpgradesTest {
   }
 
   @Test
-  fun upgradeWithRequestBody() {
+  fun upgradeWithEmptyRequestBody() {
     executeAndCheckUpgrade(upgradeRequest().newBuilder().post(RequestBody.EMPTY).build())
+  }
+
+  @Test
+  fun upgradeWithNonEmptyRequestBody() {
+    executeAndCheckUpgrade(
+      upgradeRequest()
+        .newBuilder()
+        .header("ReadRequestBodyBeforeUpgrade", "true")
+        .post("Hello".toRequestBody())
+        .build(),
+    )
   }
 
   @Test
@@ -225,21 +236,23 @@ class HttpUpgradesTest {
       ConnectionAcquired::class,
       RequestHeadersStart::class,
       RequestHeadersEnd::class,
+//      RequestBodyStart::class,
+//      RequestBodyEnd::class,
       ResponseHeadersStart::class,
       ResponseHeadersEnd::class,
       FollowUpDecision::class,
       RequestBodyStart::class,
       ResponseBodyStart::class,
       ResponseBodyEnd::class,
-      RequestBodyEnd::class,
       ConnectionReleased::class,
       CallEnd::class,
+      RequestBodyEnd::class,
     )
   }
 
   @Test
-  fun upgradeEventsWithRequestBody() {
-    upgradeWithRequestBody()
+  fun upgradeEventsWithEmptyRequestBody() {
+    upgradeWithEmptyRequestBody()
 
     assertThat(listener.recordedEventTypes()).containsExactly(
       CallStart::class,
@@ -252,30 +265,47 @@ class HttpUpgradesTest {
       ConnectionAcquired::class,
       RequestHeadersStart::class,
       RequestHeadersEnd::class,
+      RequestBodyStart::class,
+      RequestBodyEnd::class,
       ResponseHeadersStart::class,
       ResponseHeadersEnd::class,
       FollowUpDecision::class,
       RequestBodyStart::class,
       ResponseBodyStart::class,
       ResponseBodyEnd::class,
-      RequestBodyEnd::class,
       ConnectionReleased::class,
       CallEnd::class,
+      RequestBodyEnd::class,
     )
   }
 
   @Test
-  fun upgradeRequestMustHaveAnEmptyBody() {
-    val e =
-      assertFailsWith<IllegalArgumentException> {
-        Request
-          .Builder()
-          .url(server.url("/"))
-          .header("Connection", "upgrade")
-          .post("Hello".toRequestBody())
-          .build()
-      }
-    assertThat(e).hasMessage("expected a null or empty request body with 'Connection: upgrade'")
+  fun upgradeEventsWithNonEmptyRequestBody() {
+    upgradeWithNonEmptyRequestBody()
+
+    assertThat(listener.recordedEventTypes()).containsExactly(
+      CallStart::class,
+      ProxySelectStart::class,
+      ProxySelectEnd::class,
+      DnsStart::class,
+      DnsEnd::class,
+      ConnectStart::class,
+      ConnectEnd::class,
+      ConnectionAcquired::class,
+      RequestHeadersStart::class,
+      RequestHeadersEnd::class,
+      RequestBodyStart::class,
+      RequestBodyEnd::class,
+      ResponseHeadersStart::class,
+      ResponseHeadersEnd::class,
+      FollowUpDecision::class,
+      RequestBodyStart::class,
+      ResponseBodyStart::class,
+      ResponseBodyEnd::class,
+      ConnectionReleased::class,
+      CallEnd::class,
+      RequestBodyEnd::class,
+    )
   }
 
   private fun enableTls(vararg protocols: Protocol) {
